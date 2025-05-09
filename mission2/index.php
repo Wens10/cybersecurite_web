@@ -88,37 +88,49 @@
     $conn = new mysqli($env["SERVERNAME"], $env["USERNAME"], $env["PASSWORD"]);
     ?>
 
-    <form action="/" method="post">
+    <form action="index.php" method="post">
         <input type="text" name="comment" placeholder="Ajouter un post..." required>
         <button type="submit">Ajouter</button>
     </form>
 
     <div class="comment-section">
-        <?php
-        $sql = "USE {$env["DATABASE"]}";
-        $conn->query($sql);
+<?php
+// Sélection de la base
+$sql = "USE {$env["DATABASE"]}";
+$conn->query($sql);
 
-        if ($_SERVER["REQUEST_METHOD"] === "POST") {
-            $sql = "INSERT INTO comment (content) VALUES ('{$_POST["comment"]}')";
-            $conn->query($sql);
-        }
+// Traitement du formulaire d'envoi
+if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["comment"])) {
+    $comment = trim($_POST["comment"]);
 
-        $sql = "SELECT * FROM comment ORDER BY id DESC"; // plus récent d'abord
-        $result = $conn->query($sql);
+    if (!empty($comment)) {
+        $stmt = $conn->prepare("INSERT INTO comment (content) VALUES (?)");
+        $stmt->bind_param("s", $comment);
+        $stmt->execute();
+        $stmt->close();
+    }
+}
 
-        if ($result->num_rows > 0) {
-            while ($row = $result->fetch_assoc()) {
-                echo "<div class='comment'>";
-                echo "<div class='id'>#{$row["id"]}</div>";
-                echo "<div class='content'>" . $row["content"] . "</div>";
-                echo "</div>";
-            }
-        } else {
-            echo "<p class='no-comment'>Aucun commentaire pour l'instant.</p>";
-        }
+// Récupération des commentaires
+$sql = "SELECT * FROM comment ORDER BY id DESC";
+$result = $conn->query($sql);
 
-        $conn->close();
-        ?>
+if ($result->num_rows > 0) {
+    while ($row = $result->fetch_assoc()) {
+        // Protection contre XSS avec htmlspecialchars
+        $safeContent = htmlspecialchars($row["content"], ENT_QUOTES, 'UTF-8');
+        echo "<div class='comment'>";
+        echo "<div class='id'>#{$row["id"]}</div>";
+        echo "<div class='content'>{$safeContent}</div>";
+        echo "</div>";
+    }
+} else {
+    echo "<p class='no-comment'>Aucun commentaire pour l'instant.</p>";
+}
+
+$conn->close();
+?>
+
     </div>
 </body>
 </html>
